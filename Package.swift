@@ -15,11 +15,7 @@ let package = Package(
     targets: [
         .target(
             name: "MacMind",
-            path: "Sources/MacMind",
-            resources: [
-                // Adjust the relative path to point from Sources/MacMind to the package's Resources folder.
-                .copy("../../Resources")
-            ]
+            dependencies: []
         ),
         .testTarget(
             name: "MacMindTests",

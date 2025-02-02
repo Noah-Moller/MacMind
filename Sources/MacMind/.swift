@@ -1,4 +1,12 @@
 //
+//  LocalModel 2.swift
+//  MacMind
+//
+//  Created by Noah Moller on 2/2/2025.
+//
+
+
+//
 //  LocalModel.swift
 //  Mac Mind
 //
