@@ -18,8 +18,19 @@ public class LocalModel {
     private let session: URLSession = URLSession.shared
     
     /// Initializes a new instance of LocalModel.
-    public init() {
-        // Initialization code can be added here if required.
+    public init(completion: @Sendable @escaping (Bool) -> Void = { _ in }) {
+        // Optionally, pull the model if not already downloaded.
+        // (You might want to check some cached flag or status in a production app.)
+        SetupManager.pullDeepSeekModel { success in
+            if success {
+                print("DeepSeek model is ready.")
+            } else {
+                print("DeepSeek model pull failed.")
+            }
+            DispatchQueue.main.async {
+                completion(success)
+            }
+        }
     }
     
     /// Executes a prompt against the local model.
