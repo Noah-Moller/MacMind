@@ -21,6 +21,7 @@ If you haven’t installed Ollama, you can install it using Homebrew:
 ```sh
 brew install ollama
 ```
+Or download it at: https://ollama.com/download/Ollama-darwin.zip
 
 ### 2. Integrate MacMind in Xcode
 Add MacMind as a dependency in your Xcode project:
@@ -64,86 +65,27 @@ print(extractedText)
 MacMind can be integrated into a SwiftUI app with a simple UI:
 ```swift
 import SwiftUI
-import MacMind  // Import the package
+import MacMind
 
 struct ContentView: View {
-    @State private var showAlert: Bool = false
     @State private var promptText: String = "Why is the sky blue?"
-    @State private var generatedText: String = "No output yet."
-    @State private var isProcessing: Bool = false
-    @State private var streaming: Bool = false
-    @State private var showThinking: Bool = true
-    
-    // Create an instance of LocalModel.
-    // Use an initializer that accepts a completion for setup (optional).
-    @State var localModel: LocalModel = LocalModel()
+    @State private var response: String = "No output yet."
+    @State private var model = LocalModel()
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("MacMind Chat Demo")
-                .font(.largeTitle)
-                .padding(.top)
-            
-            Toggle("Stream Response", isOn: $streaming)
-                .padding([.leading, .trailing])
-            
-            Toggle("Show Thinking", isOn: $showThinking)
-                .padding([.leading, .trailing])
-            
+        VStack {
             TextField("Enter prompt", text: $promptText)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding([.leading, .trailing])
-            
-            Button(action: {
-                isProcessing = true
-                generatedText = ""
-                localModel.prompt(promptText, streaming: streaming, showThinking: showThinking) { response in
-                    generatedText += response
-                    // For streaming, you might want to update isProcessing when finished.
-                    isProcessing = false
+                .padding()
+            Button("Run Model") {
+                model.prompt(promptText) { output in
+                    response = output
                 }
-            }) {
-                Text(isProcessing ? "Processing..." : "Prompt AI")
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(isProcessing ? Color.gray : Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
             }
-            .padding([.leading, .trailing])
-            
-            ScrollView {
-                Text(generatedText)
-                    .padding()
-                    .multilineTextAlignment(.leading)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            Spacer()
-        }
-        .onAppear {
-            if !SetupManager.isOllamaInstalled() {
-                showAlert = true
-            }
-        }
-        .padding()
-        .alert(isPresented: $showAlert) {
-            Alert(
-                title: Text("Ollama Not Installed"),
-                message: Text("""
-                            This app requires Ollama to be installed.
-                            
-                            Please install Homebrew from https://brew.sh and then run:
-                            brew install ollama
-                            """),
-                dismissButton: .default(Text("OK"))
-            )
+            Text(response)
+                .padding()
         }
     }
-}
-
-#Preview {
-    ContentView()
 }
 ```
 

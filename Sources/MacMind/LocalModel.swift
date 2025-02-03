@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PDFKit
 
 /// Provides a public API to interact with the local DeepSeek R1 model via the Ollama REST API.
 public class LocalModel {
@@ -48,12 +49,12 @@ public class LocalModel {
     public func prompt(_ promptText: String,
                        streaming: Bool = false,
                        showThinking: Bool = true,
-                       pdfURLs: [URL]? = nil,
+                       pdfs: [PDFDocument]? = nil,
                        completion: @Sendable @escaping (String) -> Void) {
         // Extract text from provided PDF documents if any.
         var pdfContent: String = ""
-        if let pdfURLs = pdfURLs {
-            pdfContent = PDFExtract().extractAll(DocumentURLs: pdfURLs)
+        if let PDFs = pdfs {
+            pdfContent = PDFExtract().extractAll(Documents: PDFs)
         }
         
         // Create the URL for the chat endpoint.

@@ -14,17 +14,18 @@ public class PDFExtract {
     ///
     /// - Parameter DocumentURLs: An array of `URL` objects pointing to PDF files.
     /// - Returns: A single string containing the text from all PDFs, with simple headers separating each document.
-    public func extractAll(DocumentURLs: [URL]) -> String {
+    public func extractAll(Documents: [PDFDocument]) -> String {
         var content: String = ""
         var index: Int = 1
         content += "Uploaded Pdfs:\n\n"
         // Iterate through each provided URL, extract its content, and append it.
-        for DocumentURL in DocumentURLs {
+        for Document in Documents {
             content += "PDF \(index):\n"
-            content += extract(DocumentURL: DocumentURL)
+            content += extract(Document: Document)
             content += "\n\n"
             index += 1
         }
+        print(content)
         return content
     }
     
@@ -32,8 +33,8 @@ public class PDFExtract {
     ///
     /// - Parameter DocumentURL: The URL of the PDF file.
     /// - Returns: The extracted text content as a `String`. If the document cannot be opened, an empty string is returned.
-    private func extract(DocumentURL: URL) -> String {
-        if let pdf = PDFDocument(url: DocumentURL) {
+    private func extract(Document: PDFDocument) -> String {
+         let pdf = Document
             let pageCount = pdf.pageCount
             let documentContent = NSMutableAttributedString()
             
@@ -44,9 +45,5 @@ public class PDFExtract {
                 documentContent.append(pageContent)
             }
             return documentContent.string
-        } else {
-            // Return an empty string if the PDF cannot be loaded.
-            return ""
-        }
     }
 }
