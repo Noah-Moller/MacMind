@@ -62,6 +62,24 @@ let extractedText = pdfExtractor.extractAll(DocumentURLs: [URL(fileURLWithPath: 
 print(extractedText)
 ```
 
+### Model Setup
+Before we can prompt the model, we need to check if it's installed. If the model is not installed, then it will be automatically downloaded through Ollama. We can do this with the below code:
+```swift
+ if !modelReady {
+    Text("Setting up model…")
+        .onAppear {
+            localModel = LocalModel() { success in
+                modelReady = success
+            if !success {
+                showSetupAlert = true
+                        }
+                    }
+                }
+    } else {
+    //Your main view
+    }
+```
+
 ### Demo View
 MacMind can be integrated into a SwiftUI app with a simple UI:
 ```swift
