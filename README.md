@@ -37,6 +37,8 @@ import MacMind
 
 ## Usage
 
+Check out the [SampleView](https://github.com/Noah-Moller/MacMind/blob/main/Sources/DemoView.swift)
+
 ### Checking for Ollama Installation
 Before running the model, ensure Ollama is installed:
 ```swift
