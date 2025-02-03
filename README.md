@@ -28,6 +28,7 @@ Add MacMind as a dependency in your Xcode project:
 ```swift
 .package(url: "https://github.com/yourrepo/MacMind.git", from: "1.0.0")
 ```
+Also ensure you remove the app sandbox capability on the targets signing and capabilities section.
 
 Import the module where needed:
 ```swift
