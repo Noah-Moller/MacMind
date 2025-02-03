@@ -47,21 +47,6 @@ if SetupManager.isOllamaInstalled() {
 }
 ```
 
-### Running a Local Model
-```swift
-let model = LocalModel()
-model.prompt("What is quantum computing?", streaming: false) { response in
-    print("Response: \(response)")
-}
-```
-
-### Extracting Text from PDFs
-```swift
-let pdfExtractor = PDFExtract()
-let extractedText = pdfExtractor.extractAll(DocumentURLs: [URL(fileURLWithPath: "example.pdf")])
-print(extractedText)
-```
-
 ### Model Setup
 Before we can prompt the model, we need to check if it's installed. If the model is not installed, then it will be automatically downloaded through Ollama. We can do this with the below code:
 ```swift
@@ -78,6 +63,21 @@ Before we can prompt the model, we need to check if it's installed. If the model
     } else {
     //Your main view
     }
+```
+
+### Running a Local Model
+```swift
+let model = LocalModel()
+model.prompt("What is quantum computing?", streaming: false) { response in
+    print("Response: \(response)")
+}
+```
+
+### Extracting Text from PDFs
+```swift
+let pdfExtractor = PDFExtract()
+let extractedText = pdfExtractor.extractAll(DocumentURLs: [URL(fileURLWithPath: "example.pdf")])
+print(extractedText)
 ```
 
 ### Demo View
