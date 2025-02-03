@@ -47,6 +47,24 @@ if SetupManager.isOllamaInstalled() {
 }
 ```
 
+### Model Setup
+Before we can prompt the model, we need to check if it's installed. If the model is not installed, then it will be automatically downloaded through Ollama. We can do this with the below code:
+```swift
+ if !modelReady {
+    Text("Setting up model…")
+        .onAppear {
+            localModel = LocalModel() { success in
+                modelReady = success
+            if !success {
+                showSetupAlert = true
+                        }
+                    }
+                }
+    } else {
+    //Your main view
+    }
+```
+
 ### Running a Local Model
 ```swift
 let model = LocalModel()
