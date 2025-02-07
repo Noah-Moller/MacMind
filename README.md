@@ -2,6 +2,10 @@
 
 MacMind is a Swift package designed for easy and efficient local Large Language Model (LLM) processing in macOS applications. It provides a clean and dynamic API optimized for Apple hardware, enabling developers to seamlessly integrate LLM processing into their applications.
 
+# Explainer
+
+https://www.youtube.com/watch?v=_bcgcJChlYE
+
 ## Features
 - **Local LLM Processing**: Runs efficiently on macOS using locally hosted models.
 - **Optimized for Mac Hardware**: Uses Apple’s performance-optimized frameworks for smooth execution.
