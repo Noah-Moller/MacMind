@@ -18,6 +18,8 @@ public class LocalModel {
     /// Shared URL session for non-streaming requests.
     private let session: URLSession = URLSession.shared
     
+    private let imageClassifier = ImageClassifier()
+    
     /// Initializes a new instance of LocalModel.
     public init(completion: @Sendable @escaping (Bool) -> Void = { _ in }) {
         // Optionally, pull the model if not already downloaded.
@@ -50,6 +52,7 @@ public class LocalModel {
                        streaming: Bool = false,
                        showThinking: Bool = true,
                        pdfs: [PDFDocument]? = nil,
+                       webAccess: Bool? = false,
                        completion: @Sendable @escaping (String) -> Void) {
         // Extract text from provided PDF documents if any.
         var pdfContent: String = ""
@@ -62,7 +65,6 @@ public class LocalModel {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
         // Build the JSON payload with model identifier and user message.
         let payload: [String: Any] = [
             "model": model,
@@ -144,6 +146,45 @@ public class LocalModel {
                 }
             }
             task.resume()
+        }
+    }
+    
+    /// Executes a prompt against the local model with image analysis.
+    ///
+    /// This method first analyzes the image using the ResNet50 model, then combines the image analysis
+    /// with the provided prompt text before sending it to the language model.
+    ///
+    /// - Parameters:
+    ///   - promptText: The prompt text to send to the model.
+    ///   - image: The image to analyze.
+    ///   - streaming: If `true`, the completion handler is called repeatedly as new data chunks arrive.
+    ///   - showThinking: If `false`, any text between `<think>` and `</think>` is removed from the output.
+    ///   - completion: A closure called with the generated text (or partial updates) as a `String`.
+    public func promptWithImage(_ promptText: String,
+                              image: NSImage,
+                              streaming: Bool = false,
+                              showThinking: Bool = true,
+                              completion: @escaping (String) -> Void) async {
+        do {
+            // Analyze the image
+            let predictions = try await imageClassifier.classify(image: image)
+            let imageDescription = imageClassifier.getImageDescription(predictions: predictions)
+            
+            // Combine image analysis with the prompt
+            let combinedPrompt = """
+                Image Analysis: \(imageDescription)
+                
+                User Question: \(promptText)
+                
+                Please provide a response that takes into account both the image content and the user's question.
+                """
+            
+            // Send the combined prompt to the language model
+            prompt(combinedPrompt, streaming: streaming, showThinking: showThinking) { response in
+                completion(response)
+            }
+        } catch {
+            completion("Error analyzing image: \(error.localizedDescription)")
         }
     }
 }
