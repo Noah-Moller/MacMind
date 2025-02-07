@@ -36,62 +36,71 @@ public class ImageClassifier {
     
     private func findModelURL() -> URL? {
         let modelName = "Resnet50"
+        let fileManager = FileManager.default
         
-        // Get the bundle containing this code
-        let codeBundle = Bundle(for: ImageClassifier.self)
-        print("Code bundle path: \(codeBundle.bundlePath)")
-        
-        // Try finding the compiled model
-        if let url = codeBundle.url(forResource: modelName, withExtension: "mlmodelc") {
-            print("Found compiled model in code bundle")
-            return url
-        }
-        
-        // Try finding the model package
-        if let url = codeBundle.url(forResource: modelName, withExtension: "mlpackage") {
-            print("Found model package in code bundle")
-            return url
-        }
-        
-        // Try finding in the main bundle
-        if let url = Bundle.main.url(forResource: modelName, withExtension: "mlmodelc") {
-            print("Found compiled model in main bundle")
-            return url
-        }
-        
-        // Try finding in the main bundle resources
-        if let url = Bundle.main.resourceURL?.appendingPathComponent("Resources/\(modelName).mlpackage") {
-            if FileManager.default.fileExists(atPath: url.path) {
-                print("Found model package in main bundle resources")
-                return url
-            }
-        }
-        
-        // Try finding relative to the executable path
-        if let executableURL = Bundle.main.executableURL {
-            let baseURL = executableURL.deletingLastPathComponent()
-            let possibleLocations = [
-                baseURL.appendingPathComponent("Resources/\(modelName).mlpackage"),
-                baseURL.appendingPathComponent("\(modelName).mlpackage"),
-                baseURL.appendingPathComponent("MacMind_MacMind.bundle/Contents/Resources/\(modelName).mlpackage")
-            ]
+        // First, try to find the model in the app's Application Support directory
+        if let appSupportURL = try? fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ) {
+            let modelDirectory = appSupportURL.appendingPathComponent("MacMind/Models")
+            let modelURL = modelDirectory.appendingPathComponent("\(modelName).mlpackage")
             
-            for url in possibleLocations {
-                if FileManager.default.fileExists(atPath: url.path) {
-                    print("Found model at: \(url.path)")
-                    return url
+            // If the model doesn't exist in Application Support, try to copy it from the bundle
+            if !fileManager.fileExists(atPath: modelURL.path) {
+                print("Model not found in Application Support, attempting to copy from bundle...")
+                
+                // Try to find the model in various bundle locations
+                let possibleSourceURLs = [
+                    Bundle.main.url(forResource: modelName, withExtension: "mlpackage"),
+                    Bundle(for: type(of: self)).url(forResource: modelName, withExtension: "mlpackage"),
+                    Bundle.main.resourceURL?.appendingPathComponent("Resources/\(modelName).mlpackage"),
+                    Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/\(modelName).mlpackage")
+                ]
+                
+                if let sourceURL = possibleSourceURLs.first(where: { url in
+                    url != nil && fileManager.fileExists(atPath: url!.path)
+                }) {
+                    do {
+                        try fileManager.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
+                        try fileManager.copyItem(at: sourceURL!, to: modelURL)
+                        print("Successfully copied model to: \(modelURL.path)")
+                        return modelURL
+                    } catch {
+                        print("Failed to copy model: \(error)")
+                    }
                 }
+                
+                // If we couldn't find the model in the bundle, try the source directory
+                let sourceDirectory = Bundle.main.bundleURL
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("Sources/MacMind/Resources/\(modelName).mlpackage")
+                
+                if fileManager.fileExists(atPath: sourceDirectory.path) {
+                    do {
+                        try fileManager.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
+                        try fileManager.copyItem(at: sourceDirectory, to: modelURL)
+                        print("Successfully copied model from source directory to: \(modelURL.path)")
+                        return modelURL
+                    } catch {
+                        print("Failed to copy model from source directory: \(error)")
+                    }
+                }
+            } else {
+                print("Found model in Application Support: \(modelURL.path)")
+                return modelURL
             }
         }
         
         print("\nSearched locations:")
-        print("1. Code bundle: \(codeBundle.bundlePath)")
+        print("1. Application Support directory")
         print("2. Main bundle: \(Bundle.main.bundlePath)")
+        print("3. Code bundle: \(Bundle(for: type(of: self)).bundlePath)")
         if let resourcePath = Bundle.main.resourcePath {
-            print("3. Main bundle resources: \(resourcePath)")
-        }
-        if let executablePath = Bundle.main.executablePath {
-            print("4. Executable path: \(executablePath)")
+            print("4. Resource path: \(resourcePath)")
         }
         
         return nil
