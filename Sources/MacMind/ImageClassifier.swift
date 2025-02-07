@@ -18,18 +18,56 @@ public class ImageClassifier {
     
     public init() {
         do {
-            // Get the model URL from the bundle
-            let currentBundle = Bundle(for: type(of: self))
-            guard let modelURL = currentBundle.url(forResource: "Resnet50", withExtension: "mlpackage") else {
-                print("Failed to find the model file.")
+            // Try multiple approaches to find the model
+            let modelURL = findModelURL()
+            guard let url = modelURL else {
+                print("Failed to find the model file. Searched in bundle and file system.")
                 return
             }
             
+            print("Found model at: \(url.path)")
+            
             // Create the model
-            model = try VNCoreMLModel(for: MLModel(contentsOf: modelURL))
+            model = try VNCoreMLModel(for: MLModel(contentsOf: url))
         } catch {
             print("Failed to create the model: \(error)")
         }
+    }
+    
+    private func findModelURL() -> URL? {
+        let modelName = "Resnet50"
+        let modelExtension = "mlmodelc"
+        
+        // Try the bundle that contains this class
+        let currentBundle = Bundle(for: type(of: self))
+        if let url = currentBundle.url(forResource: modelName, withExtension: modelExtension) {
+            return url
+        }
+        
+        // Try the main bundle
+        if let url = Bundle.main.url(forResource: modelName, withExtension: modelExtension) {
+            return url
+        }
+        
+        // Try the package's Resources directory
+        let resourcesPath = currentBundle.bundlePath + "/Contents/Resources"
+        let resourcesURL = URL(fileURLWithPath: resourcesPath)
+        let modelURL = resourcesURL.appendingPathComponent(modelName).appendingPathExtension(modelExtension)
+        if FileManager.default.fileExists(atPath: modelURL.path) {
+            return modelURL
+        }
+        
+        // Try the compiled model package
+        if let url = currentBundle.url(forResource: modelName, withExtension: "mlpackage") {
+            return url
+        }
+        
+        print("Searched locations:")
+        print("1. Current bundle: \(currentBundle.bundlePath)")
+        print("2. Main bundle: \(Bundle.main.bundlePath)")
+        print("3. Resources path: \(resourcesPath)")
+        
+        return nil
     }
     
     public func classify(image: NSImage, topK: Int = 3) async throws -> [ImagePrediction] {
