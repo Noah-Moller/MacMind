@@ -36,36 +36,63 @@ public class ImageClassifier {
     
     private func findModelURL() -> URL? {
         let modelName = "Resnet50"
-        let modelExtension = "mlmodelc"
         
-        // Try the bundle that contains this class
-        let currentBundle = Bundle(for: type(of: self))
-        if let url = currentBundle.url(forResource: modelName, withExtension: modelExtension) {
+        // Get the bundle containing this code
+        let codeBundle = Bundle(for: ImageClassifier.self)
+        print("Code bundle path: \(codeBundle.bundlePath)")
+        
+        // Try finding the compiled model
+        if let url = codeBundle.url(forResource: modelName, withExtension: "mlmodelc") {
+            print("Found compiled model in code bundle")
             return url
         }
         
-        // Try the main bundle
-        if let url = Bundle.main.url(forResource: modelName, withExtension: modelExtension) {
+        // Try finding the model package
+        if let url = codeBundle.url(forResource: modelName, withExtension: "mlpackage") {
+            print("Found model package in code bundle")
             return url
         }
         
-        // Try the package's Resources directory
-        let resourcesPath = currentBundle.bundlePath + "/Contents/Resources"
-        let resourcesURL = URL(fileURLWithPath: resourcesPath)
-        let modelURL = resourcesURL.appendingPathComponent(modelName).appendingPathExtension(modelExtension)
-        if FileManager.default.fileExists(atPath: modelURL.path) {
-            return modelURL
-        }
-        
-        // Try the compiled model package
-        if let url = currentBundle.url(forResource: modelName, withExtension: "mlpackage") {
+        // Try finding in the main bundle
+        if let url = Bundle.main.url(forResource: modelName, withExtension: "mlmodelc") {
+            print("Found compiled model in main bundle")
             return url
         }
         
-        print("Searched locations:")
-        print("1. Current bundle: \(currentBundle.bundlePath)")
+        // Try finding in the main bundle resources
+        if let url = Bundle.main.resourceURL?.appendingPathComponent("Resources/\(modelName).mlpackage") {
+            if FileManager.default.fileExists(atPath: url.path) {
+                print("Found model package in main bundle resources")
+                return url
+            }
+        }
+        
+        // Try finding relative to the executable path
+        if let executableURL = Bundle.main.executableURL {
+            let baseURL = executableURL.deletingLastPathComponent()
+            let possibleLocations = [
+                baseURL.appendingPathComponent("Resources/\(modelName).mlpackage"),
+                baseURL.appendingPathComponent("\(modelName).mlpackage"),
+                baseURL.appendingPathComponent("MacMind_MacMind.bundle/Contents/Resources/\(modelName).mlpackage")
+            ]
+            
+            for url in possibleLocations {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    print("Found model at: \(url.path)")
+                    return url
+                }
+            }
+        }
+        
+        print("\nSearched locations:")
+        print("1. Code bundle: \(codeBundle.bundlePath)")
         print("2. Main bundle: \(Bundle.main.bundlePath)")
-        print("3. Resources path: \(resourcesPath)")
+        if let resourcePath = Bundle.main.resourcePath {
+            print("3. Main bundle resources: \(resourcePath)")
+        }
+        if let executablePath = Bundle.main.executablePath {
+            print("4. Executable path: \(executablePath)")
+        }
         
         return nil
     }

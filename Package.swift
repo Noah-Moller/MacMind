@@ -23,7 +23,6 @@ let package = Package(
             name: "MacMind",
             dependencies: [.product(name: "SwiftSoup", package: "SwiftSoup")],
             resources: [
-                .process("Resources"),
                 .copy("Resources/Resnet50.mlpackage")
             ]
         ),
