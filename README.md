@@ -8,10 +8,11 @@ https://www.youtube.com/watch?v=_bcgcJChlYE
 
 ## Features
 - **Local LLM Processing**: Runs efficiently on macOS using locally hosted models.
-- **Optimized for Mac Hardware**: Uses Apple’s performance-optimized frameworks for smooth execution.
+- **Optimized for Mac Hardware**: Uses Apple's performance-optimized frameworks for smooth execution.
 - **Seamless Integration**: Works easily with Swift applications.
 - **Supports PDF Extraction**: Extracts text from PDFs and includes it in model prompts.
 - **Streaming Mode**: Supports real-time response streaming.
+- **HTTP Server Mode**: Run as a server to provide API access from any machine on your network.
 
 ## Requirements
 - macOS 13.0 or later
@@ -21,7 +22,7 @@ https://www.youtube.com/watch?v=_bcgcJChlYE
 
 ## Installation
 ### 1. Install Ollama
-If you haven’t installed Ollama, you can install it using Homebrew:
+If you haven't installed Ollama, you can install it using Homebrew:
 ```sh
 brew install ollama
 ```
@@ -85,6 +86,65 @@ let pdfExtractor = PDFExtract()
 let extractedText = pdfExtractor.extractAll(DocumentURLs: [URL(fileURLWithPath: "example.pdf")])
 print(extractedText)
 ```
+
+### Running as a Server
+MacMind can be run as a server, allowing you to access the LLM capabilities from any machine on your network:
+
+```bash
+# Run with default settings (0.0.0.0:3467)
+swift run macmind-server
+
+# Run with custom host and port
+swift run macmind-server --host 127.0.0.1 --port 8080
+```
+
+#### Server Endpoints
+
+1. Health Check:
+```bash
+curl http://localhost:3467/health
+```
+
+2. Status Check:
+```bash
+curl http://localhost:3467/status
+```
+
+3. Send a Prompt (non-streaming):
+```bash
+curl -X POST http://localhost:3467/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "What is quantum computing?",
+    "stream": false,
+    "showThinking": true
+  }'
+```
+
+4. Send a Prompt (streaming):
+```bash
+curl -X POST http://localhost:3467/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "What is quantum computing?",
+    "stream": true,
+    "showThinking": true
+  }'
+```
+
+5. Send a Prompt with PDF Context:
+```bash
+curl -X POST http://localhost:3467/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Summarize this document",
+    "stream": false,
+    "showThinking": true,
+    "pdfURLs": ["file:///path/to/your/document.pdf"]
+  }'
+```
+
+To access the server from other machines, replace `localhost` with your Mac's IP address.
 
 ### Demo View
 MacMind can be integrated into a SwiftUI app with a simple UI:

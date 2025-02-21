@@ -14,9 +14,15 @@ let package = Package(
             name: "MacMind",
             targets: ["MacMind"]
         ),
+        .executable(
+            name: "macmind-server",
+            targets: ["MacMindServer"]
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/scinfu/SwiftSoup.git", .upToNextMajor(from: "2.7.7")),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
         .target(
@@ -24,6 +30,14 @@ let package = Package(
             dependencies: [.product(name: "SwiftSoup", package: "SwiftSoup")],
             resources: [
                 .copy("../../Models/Resnet50.mlpackage")
+            ]
+        ),
+        .executableTarget(
+            name: "MacMindServer",
+            dependencies: [
+                "MacMind",
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
         ),
         .testTarget(
