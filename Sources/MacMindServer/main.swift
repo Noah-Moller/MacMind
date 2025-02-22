@@ -53,6 +53,9 @@ struct MacMindServer: ParsableCommand {
                 // Create a shared LocalModel instance
                 let model = LocalModel()
                 
+                // Create request logger
+                let logger = RequestLogger()
+                
                 // Health check endpoint
                 app.get("health") { req -> String in
                     return "MacMind server is running"
@@ -67,6 +70,11 @@ struct MacMindServer: ParsableCommand {
                     ]
                 }
                 
+                // Logs endpoint
+                app.get("logs") { req -> String in
+                    return logger.getLogContents()
+                }
+                
                 // Prompt endpoint
                 app.post("prompt") { req async throws -> Response in
                     struct PromptRequest: Content {
@@ -77,6 +85,10 @@ struct MacMindServer: ParsableCommand {
                     }
                     
                     let promptRequest = try req.content.decode(PromptRequest.self)
+                    
+                    // Log the request
+                    let clientIP = req.remoteAddress?.hostname ?? "unknown"
+                    logger.logRequest(prompt: promptRequest.prompt, ip: clientIP)
                     
                     // Convert URLs to PDFDocuments if provided
                     let pdfDocuments: [PDFDocument]? = promptRequest.pdfURLs?.compactMap { url in
