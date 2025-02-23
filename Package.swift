@@ -27,7 +27,9 @@ let package = Package(
     targets: [
         .target(
             name: "MacMind",
-            dependencies: [.product(name: "SwiftSoup", package: "SwiftSoup")],
+            dependencies: [
+                .product(name: "SwiftSoup", package: "SwiftSoup")
+            ],
             resources: [
                 .copy("../../Models/Resnet50.mlpackage")
             ]

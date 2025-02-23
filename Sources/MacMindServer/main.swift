@@ -51,7 +51,7 @@ struct MacMindServer: ParsableCommand {
                 app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
                 
                 // Create a shared LocalModel instance
-                let model = LocalModel()
+                let model = await LocalModel()
                 
                 // Create request logger
                 let logger = RequestLogger()

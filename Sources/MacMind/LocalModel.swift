@@ -21,19 +21,10 @@ public class LocalModel {
     private let imageClassifier = ImageClassifier()
     
     /// Initializes a new instance of LocalModel.
-    public init(completion: @Sendable @escaping (Bool) -> Void = { _ in }) {
+    public init(completion: @Sendable @escaping (Bool) -> Void = { _ in }) async {
         // Optionally, pull the model if not already downloaded.
         // (You might want to check some cached flag or status in a production app.)
-        SetupManager.pullDeepSeekModel { success in
-            if success {
-                print("DeepSeek model is ready.")
-            } else {
-                print("DeepSeek model pull failed.")
-            }
-            DispatchQueue.main.async {
-                completion(success)
-            }
-        }
+        await SetupManager().setup()
     }
     
     /// Executes a prompt against the local model.

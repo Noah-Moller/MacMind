@@ -3,27 +3,28 @@ import AppKit
 import UniformTypeIdentifiers
 
 public struct DemoView: View {
+    @StateObject private var setupManager = SetupManager.shared
     @State private var promptText: String = ""
     @State private var response: String = "No output yet."
-    @State private var modelReady: Bool = false
-    @State private var showSetupAlert: Bool = false
     @State private var selectedImage: NSImage?
     @State private var isProcessing: Bool = false
     @State private var showImagePicker = false
-    @State private var localModel: LocalModel? = nil
+    @State private var localModel: LocalModel?
     
     public init() {}
     
+    private var isSetupComplete: Bool {
+        setupManager.status == .completed
+    }
+    
     public var body: some View {
         VStack {
-            if !modelReady {
-                Text("Setting up model…")
-                    .onAppear {
-                        localModel = LocalModel() { success in
-                            modelReady = success
-                            if !success {
-                                showSetupAlert = true
-                            }
+            if !isSetupComplete {
+                SetupLoadingView()
+                    .task {
+                        await setupManager.setup()
+                        if isSetupComplete {
+                            localModel = await LocalModel()
                         }
                     }
             } else {
@@ -92,6 +93,8 @@ public struct DemoView: View {
                         
                         if isProcessing {
                             ProgressView()
+                                .scaleEffect(1.5)
+                                .padding()
                         }
                         
                         Text(response)
@@ -103,10 +106,29 @@ public struct DemoView: View {
             }
         }
         .alert("Setup Failed",
-               isPresented: $showSetupAlert) {
-            Button("OK", role: .cancel) { }
+               isPresented: .init(
+                get: { setupManager.status.isFailed },
+                set: { _ in }
+               )) {
+            Button("Retry", action: {
+                Task {
+                    await setupManager.setup()
+                }
+            })
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Failed to setup the model. Please ensure Ollama is installed and running.")
+            if case .failed(let error) = setupManager.status {
+                Text(error)
+            }
         }
+    }
+}
+
+private extension SetupStatus {
+    var isFailed: Bool {
+        if case .failed(_) = self {
+            return true
+        }
+        return false
     }
 }

@@ -6,9 +6,69 @@
 //
 
 import Foundation
+import SwiftUI
+
+/// Represents the current status of the setup process
+public enum SetupStatus: Equatable {
+    case notStarted
+    case installingHomebrew
+    case installingOllama
+    case installingModel
+    case completed
+    case failed(String)
+    
+    public var description: String {
+        switch self {
+        case .notStarted: return "Setup not started"
+        case .installingHomebrew: return "Installing Homebrew..."
+        case .installingOllama: return "Installing Ollama..."
+        case .installingModel: return "Installing DeepSeek model..."
+        case .completed: return "Setup completed successfully"
+        case .failed(let error): return "Setup failed: \(error)"
+        }
+    }
+    
+    public static func == (lhs: SetupStatus, rhs: SetupStatus) -> Bool {
+        switch (lhs, rhs) {
+        case (.notStarted, .notStarted),
+             (.installingHomebrew, .installingHomebrew),
+             (.installingOllama, .installingOllama),
+             (.installingModel, .installingModel),
+             (.completed, .completed):
+            return true
+        case (.failed(let lhsError), .failed(let rhsError)):
+            return lhsError == rhsError
+        default:
+            return false
+        }
+    }
+}
 
 /// A public helper to check for and install prerequisites.
-public class SetupManager {
+public class SetupManager: ObservableObject {
+    /// Published property to track setup status
+    @Published public private(set) var status: SetupStatus = .notStarted
+    
+    /// Singleton instance
+    public static let shared = SetupManager()
+    
+    init() {}
+    
+    /// Returns true if Homebrew is installed
+    private func isHomebrewInstalled() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["brew"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
     
     /// Returns true if Ollama is found in common locations.
     public static func isOllamaInstalled() -> Bool {
@@ -20,6 +80,30 @@ public class SetupManager {
             }
         }
         return false
+    }
+    
+    /// Installs Homebrew using the official script
+    private func installHomebrew() async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-c", "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"]
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(domain: "com.macmind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Homebrew installation failed"])
+        }
+    }
+    
+    /// Installs Ollama using Homebrew
+    private func installOllama() async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/brew")
+        process.arguments = ["install", "ollama"]
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(domain: "com.macmind", code: 2, userInfo: [NSLocalizedDescriptionKey: "Ollama installation failed"])
+        }
     }
     
     /// Checks if the DeepSeek model is already installed by listing available models.
@@ -63,84 +147,67 @@ public class SetupManager {
     }
     
     /// Runs the command "ollama pull deepseek-r1:1.5b" to download the DeepSeek model.
-    ///
-    /// - Parameter completion: A closure that is called with `true` if the command succeeded,
-    ///   or `false` otherwise.
-    public static func pullDeepSeekModel(completion: @escaping (Bool) -> Void) {
-        // First, check if the model is already installed.
-        if isDeepSeekInstalled() {
-            print("DeepSeek model is already installed.")
-            completion(true)
-            return
+    private func installDeepSeekModel() async throws {
+        guard let ollama = ["/usr/local/bin/ollama", "/opt/homebrew/bin/ollama"]
+            .first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            throw NSError(domain: "com.macmind", code: 3, userInfo: [NSLocalizedDescriptionKey: "Ollama executable not found"])
         }
         
-        // If not, attempt to pull the model.
-        let fileManager = FileManager.default
-        let possiblePaths = ["/usr/local/bin/ollama", "/opt/homebrew/bin/ollama"]
-        var ollamaExecutable: String?
-        for path in possiblePaths {
-            if fileManager.fileExists(atPath: path) {
-                ollamaExecutable = path
-                break
-            }
-        }
-        
-        guard let ollama = ollamaExecutable else {
-            print("Ollama executable not found.")
-            completion(false)
-            return
-        }
-        
-        print("DeepSeek model not found. Pulling model using Ollama...")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ollama)
         process.arguments = ["pull", "deepseek-r1:1.5b"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let success = process.terminationStatus == 0
-                if success {
-                    print("DeepSeek model downloaded successfully.")
-                } else {
-                    print("Failed to download DeepSeek model. Termination status: \(process.terminationStatus)")
-                }
-                // After pull completes, check again whether the model is installed.
-                let installed = isDeepSeekInstalled()
-                DispatchQueue.main.async {
-                    completion(installed)
-                }
-            } catch {
-                print("Error running ollama pull command: \(error)")
-                DispatchQueue.main.async {
-                    completion(false)
-                }
-            }
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(domain: "com.macmind", code: 4, userInfo: [NSLocalizedDescriptionKey: "Model installation failed"])
         }
     }
     
-    /// Runs the setup process:
-    /// - If Homebrew is not installed, instructs the user to install Homebrew.
-    /// - Then, if Ollama is not installed, instructs the user to install Ollama.
-    /// - Finally, if the DeepSeek model is not installed, automatically pulls it.
-    public static func setupOllamaIfNeeded(completion: @escaping (Bool) -> Void) {
-        if !isOllamaInstalled() {
-            print("Ollama is not installed. Please install Ollama (e.g., via Homebrew: brew install ollama).")
-            completion(false)
-        } else {
-            print("Ollama is installed.")
-            pullDeepSeekModel { success in
-                if success {
-                    print("Ollama and DeepSeek model are ready.")
-                } else {
-                    print("Ollama setup failed (model not downloaded).")
-                }
-                completion(success)
+    /// Runs the complete setup process, installing all required components
+    public func setup() async {
+        do {
+            status = .installingHomebrew
+            if !isHomebrewInstalled() {
+                try await installHomebrew()
+            }
+            
+            status = .installingOllama
+            if !Self.isOllamaInstalled() {
+                try await installOllama()
+            }
+            
+            status = .installingModel
+            if !Self.isDeepSeekInstalled() {
+                try await installDeepSeekModel()
+            }
+            
+            status = .completed
+        } catch {
+            status = .failed(error.localizedDescription)
+        }
+    }
+}
+
+/// A SwiftUI view that shows the setup progress
+public struct SetupLoadingView: View {
+    @ObservedObject private var setupManager = SetupManager.shared
+    
+    public init() {}
+    
+    public var body: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .scaleEffect(1.5)
+            
+            Text(setupManager.status.description)
+                .font(.headline)
+            
+            if case .failed(let error) = setupManager.status {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.subheadline)
             }
         }
+        .padding()
     }
 }
