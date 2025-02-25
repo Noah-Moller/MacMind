@@ -104,7 +104,7 @@ struct MacMindServer: ParsableCommand {
                                      "Cache-Control": "no-cache",
                                      "Connection": "keep-alive"],
                             body: .init(stream: { writer in
-                                model.prompt(
+                                model.sendPromptSync(
                                     promptRequest.prompt,
                                     streaming: true,
                                     showThinking: promptRequest.showThinking ?? true,
@@ -118,9 +118,9 @@ struct MacMindServer: ParsableCommand {
                         )
                     } else {
                         return try await withCheckedThrowingContinuation { continuation in
-                            model.prompt(
+                            model.sendPromptSync(
                                 promptRequest.prompt,
-                                streaming: false,
+                                streaming: true,
                                 showThinking: promptRequest.showThinking ?? true,
                                 pdfs: pdfDocuments,
                                 webAccess: false

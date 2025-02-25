@@ -1,6 +1,6 @@
 # MacMind
 
-MacMind is a Swift package designed for easy and efficient local Large Language Model (LLM) processing in macOS applications. It provides a clean and dynamic API optimized for Apple hardware, enabling developers to seamlessly integrate LLM processing into their applications.
+MacMind is a Swift package designed for easy and efficient local Large Language Model (LLM) processing and advanced image analysis in macOS applications. It provides a clean and dynamic API optimized for Apple hardware, enabling developers to seamlessly integrate LLM processing and intelligent image analysis into their applications.
 
 # Explainer
 
@@ -8,6 +8,12 @@ https://www.youtube.com/watch?v=_bcgcJChlYE
 
 ## Features
 - **Local LLM Processing**: Runs efficiently on macOS using locally hosted models.
+- **Advanced Image Analysis**: 
+  - Object detection and classification using MobileNetV2
+  - Intelligent classification consolidation (e.g., recognizing different cat breeds as "cat")
+  - Color analysis and detection
+  - Text extraction from images
+  - Natural language description generation
 - **Optimized for Mac Hardware**: Uses Apple's performance-optimized frameworks for smooth execution.
 - **Seamless Integration**: Works easily with Swift applications.
 - **Supports PDF Extraction**: Extracts text from PDFs and includes it in model prompts.
@@ -42,6 +48,55 @@ import MacMind
 
 ## Usage
 
+### Image Analysis
+```swift
+import MacMind
+
+// Create an image classifier
+let classifier = ImageClassifier()
+
+// Analyze an image
+if let image = NSImage(contentsOf: imageURL) {
+    do {
+        let result = try await classifier.analyzeImage(image)
+        
+        // Access the natural language description
+        print(result.description)
+        
+        // Access individual predictions
+        for prediction in result.predictions {
+            print("\(prediction.label): \(Int(prediction.probability * 100))%")
+        }
+        
+        // Access dominant colors
+        print("Dominant colors: \(result.dominantColors.joined(separator: ", "))")
+        
+        // Access extracted text
+        if !result.extractedText.isEmpty {
+            print("Extracted text: \(result.extractedText.joined(separator: " "))")
+        }
+    } catch {
+        print("Analysis failed: \(error)")
+    }
+}
+```
+
+Example outputs:
+```
+// For a cat image:
+"This appears to be an orange cat that is clearly visible."
+
+// For a car image:
+"This appears to be a blue vehicle with a sedan body style."
+
+// For a flower:
+"This image shows a red rose showing its natural beauty."
+
+// For an image with text:
+"This image contains text that reads: 'Welcome to MacMind'"
+```
+
+### LLM Processing
 Check out the [SampleView](https://github.com/Noah-Moller/MacMind/blob/main/Sources/DemoView.swift)
 
 ### Checking for Ollama Installation
@@ -185,4 +240,4 @@ Contributions are welcome! Feel free to submit issues and pull requests.
 
 ---
 
-With MacMind, you can harness the power of LLMs on macOS efficiently and seamlessly. Happy coding!
+With MacMind, you can harness the power of LLMs and advanced image analysis on macOS efficiently and seamlessly. Happy coding!

@@ -27,19 +27,128 @@ public class LocalModel {
         await SetupManager().setup()
     }
     
-    /// Executes a prompt against the local model.
-    ///
-    /// This method builds a JSON payload combining any extracted PDF text (if provided) with the prompt text,
-    /// and sends the request to the Ollama REST API. It supports both streaming and non-streaming modes.
+    /// Executes a prompt against the local model with optional images and PDFs (async version).
     ///
     /// - Parameters:
-    ///   - promptText: The prompt text to send to the model.
+    ///   - prompt: The prompt text to send to the model.
+    ///   - images: Optional array of images to analyze and include in the context.
     ///   - streaming: If `true`, the completion handler is called repeatedly as new data chunks arrive.
     ///   - showThinking: If `false`, any text between `<think>` and `</think>` is removed from the output.
-    ///   - pdfURLs: An optional array of URLs pointing to PDF documents; their content is extracted and
-    ///              prepended to the prompt.
-    ///   - completion: A closure called with the generated text (or partial updates) as a `String`.
-    public func prompt(_ promptText: String,
+    ///   - pdfs: Optional array of PDF documents to include in the context.
+    ///   - webAccess: Whether to allow web access and scrape URLs found in the prompt.
+    ///   - completion: A closure called with the generated text as a `String`.
+    public func prompt(_ prompt: String,
+                      images: [NSImage]? = nil,
+                      streaming: Bool = false,
+                      showThinking: Bool = true,
+                      pdfs: [PDFDocument]? = nil,
+                      webAccess: Bool = false,
+                      completion: @escaping (String) -> Void) async {
+        do {
+            var fullPrompt = prompt
+            var webContext = ""
+            
+            // If web access is enabled, try to extract and scrape URLs from the prompt
+            if webAccess {
+                let urlPattern = try NSRegularExpression(pattern: "https?://[^\\s]+")
+                let range = NSRange(prompt.startIndex..., in: prompt)
+                let matches = urlPattern.matches(in: prompt, range: range)
+                
+                for match in matches {
+                    if let range = Range(match.range, in: prompt) {
+                        let url = String(prompt[range])
+                        do {
+                            let scrapedContent = try await WebScraper.scrapeWebsite(url: url)
+                            webContext += """
+                            
+                            Content from \(url):
+                            \(scrapedContent)
+                            
+                            """
+                        } catch {
+                            print("Failed to scrape URL \(url): \(error)")
+                        }
+                    }
+                }
+            }
+            
+            // If images are provided, analyze them first
+            if let images = images, !images.isEmpty {
+                var imageAnalyses: [String] = []
+                
+                for (index, image) in images.enumerated() {
+                    let analysis = try await imageClassifier.analyzeImage(image)
+                    let imageContext = """
+                    
+                    Image \(index + 1) Analysis:
+                    - Description: \(analysis.description)
+                    - Detected Objects: \(analysis.predictions.map { "\($0.label) (\(Int($0.probability * 100))%)" }.joined(separator: ", "))
+                    - Dominant Colors: \(analysis.dominantColors.joined(separator: ", "))
+                    \(analysis.extractedText.isEmpty ? "" : "- Extracted Text: \"\(analysis.extractedText.joined(separator: " "))\"")
+                    """
+                    imageAnalyses.append(imageContext)
+                }
+                
+                fullPrompt = """
+                Context from Images:
+                \(imageAnalyses.joined(separator: "\n"))
+                \(webContext.isEmpty ? "" : "\nWeb Context:\n\(webContext)")
+                
+                User Question: \(prompt)
+                
+                Please provide a response that takes into account all aspects of the image analyses, web content, and the user's question.
+                """
+            } else if !webContext.isEmpty {
+                // If we only have web context
+                fullPrompt = """
+                Web Context:
+                \(webContext)
+                
+                User Question: \(prompt)
+                
+                Please provide a response that takes into account the web content and the user's question.
+                """
+            }
+            
+            // Send the prompt to the language model
+            sendPrompt(fullPrompt, streaming: streaming, showThinking: showThinking, pdfs: pdfs, webAccess: webAccess) { response in
+                completion(response)
+            }
+        } catch {
+            completion("Error processing request: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Non-async version of prompt that automatically handles async calls
+    ///
+    /// - Parameters:
+    ///   - prompt: The prompt text to send to the model.
+    ///   - streaming: If `true`, the completion handler is called repeatedly as new data chunks arrive.
+    ///   - showThinking: If `false`, any text between `<think>` and `</think>` is removed from the output.
+    ///   - pdfs: Optional array of PDF documents to include in the context.
+    ///   - webAccess: Whether to allow web access (currently not implemented).
+    ///   - completion: A closure called with the generated text as a `String`.
+    public func sendPromptSync(_ prompt: String,
+                             streaming: Bool = false,
+                             showThinking: Bool = true,
+                             pdfs: [PDFDocument]? = nil,
+                             webAccess: Bool = false,
+                             completion: @escaping (String) -> Void) {
+        // Create a Task to handle the async call
+        Task {
+            await self.prompt(
+                prompt,
+                streaming: streaming,
+                showThinking: showThinking,
+                pdfs: pdfs,
+                webAccess: webAccess,
+                completion: completion
+            )
+        }
+    }
+    
+    /// Internal method to send a prompt to the Ollama API
+    private func sendPrompt(_ promptText: String,
                        streaming: Bool = false,
                        showThinking: Bool = true,
                        pdfs: [PDFDocument]? = nil,
@@ -142,8 +251,9 @@ public class LocalModel {
     
     /// Executes a prompt against the local model with image analysis.
     ///
-    /// This method first analyzes the image using the ResNet50 model, then combines the image analysis
-    /// with the provided prompt text before sending it to the language model.
+    /// This method first analyzes the image using the MobileNetV2 model, then combines the image analysis
+    /// with the provided prompt text before sending it to the language model. The analysis includes object
+    /// detection, color analysis, and text extraction.
     ///
     /// - Parameters:
     ///   - promptText: The prompt text to send to the model.
@@ -157,21 +267,24 @@ public class LocalModel {
                               showThinking: Bool = true,
                               completion: @escaping (String) -> Void) async {
         do {
-            // Analyze the image
-            let predictions = try await imageClassifier.classify(image: image)
-            let imageDescription = imageClassifier.getImageDescription(predictions: predictions)
+            // Analyze the image using the enhanced image classifier
+            let analysisResult = try await imageClassifier.analyzeImage(image)
             
-            // Combine image analysis with the prompt
+            // Build a comprehensive prompt that includes all analysis results
             let combinedPrompt = """
-                Image Analysis: \(imageDescription)
+                Image Analysis:
+                - Description: \(analysisResult.description)
+                - Detected Objects: \(analysisResult.predictions.map { "\($0.label) (\(Int($0.probability * 100))%)" }.joined(separator: ", "))
+                - Dominant Colors: \(analysisResult.dominantColors.joined(separator: ", "))
+                \(analysisResult.extractedText.isEmpty ? "" : "- Extracted Text: \"\(analysisResult.extractedText.joined(separator: " "))\"")
                 
                 User Question: \(promptText)
                 
-                Please provide a response that takes into account both the image content and the user's question.
+                Please provide a response that takes into account all aspects of the image analysis (objects, colors, text if present) and the user's question.
                 """
             
             // Send the combined prompt to the language model
-            prompt(combinedPrompt, streaming: streaming, showThinking: showThinking) { response in
+            sendPrompt(combinedPrompt, streaming: streaming, showThinking: showThinking) { response in
                 completion(response)
             }
         } catch {

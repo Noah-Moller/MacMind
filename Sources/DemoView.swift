@@ -1,134 +1,165 @@
-import SwiftUI
-import AppKit
-import UniformTypeIdentifiers
+import MacMind
 
+/// A demonstration view showcasing MacMind's capabilities.
+/// This view allows users to:
+/// - Select images for analysis
+/// - Ask questions about images
+/// - Interact with the LLM
+/// - See real-time streaming responses
+/// - Analyze web content from URLs
 public struct DemoView: View {
-    @StateObject private var setupManager = SetupManager.shared
     @State private var promptText: String = ""
-    @State private var response: String = "No output yet."
+    @State private var response: String = ""
     @State private var selectedImage: NSImage?
     @State private var isProcessing: Bool = false
     @State private var showImagePicker = false
     @State private var localModel: LocalModel?
+    @State private var modelReady: Bool = false
+    @State private var showSetupAlert: Bool = false
+    @State private var webAccessEnabled: Bool = false
+    @State private var isWebProcessing: Bool = false
     
     public init() {}
     
-    private var isSetupComplete: Bool {
-        setupManager.status == .completed
+    public var body: some View {
+        VStack(spacing: 20) {
+            if !modelReady {
+                setupView
+            } else {
+                mainView
+            }
+        }
+        .alert("Setup Error", isPresented: $showSetupAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Failed to initialize the model. Please ensure Ollama is installed and running.")
+        }
     }
     
-    public var body: some View {
+    private var setupView: some View {
         VStack {
-            if !isSetupComplete {
-                SetupLoadingView()
-                    .task {
-                        await setupManager.setup()
-                        if isSetupComplete {
-                            localModel = await LocalModel()
-                        }
+            .task {
+                localModel = await LocalModel { success in
+                    modelReady = success
+                    if !success {
+                        showSetupAlert = true
                     }
-            } else {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        if let selectedImage {
-                            Image(nsImage: selectedImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxHeight: 200)
-                        }
-                        
-                        Button(action: {
-                            showImagePicker = true
-                        }) {
-                            Label("Select Image", systemImage: "photo")
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                        .fileImporter(
-                            isPresented: $showImagePicker,
-                            allowedContentTypes: [.image],
-                            allowsMultipleSelection: false
-                        ) { result in
-                            switch result {
-                            case .success(let urls):
-                                if let url = urls.first,
-                                   let image = NSImage(contentsOf: url) {
-                                    selectedImage = image
-                                }
-                            case .failure(let error):
-                                print("Error selecting image: \(error.localizedDescription)")
-                            }
-                        }
-                        
-                        TextField("Enter your prompt...", text: $promptText)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding()
-                        
-                        Button(action: {
-                            Task {
-                                guard let model = localModel else { return }
-                                isProcessing = true
-                                if let image = selectedImage {
-                                    await model.promptWithImage(promptText, image: image) { result in
-                                        response = result
-                                        isProcessing = false
-                                    }
-                                } else {
-                                    model.prompt(promptText) { result in
-                                        response = result
-                                        isProcessing = false
-                                    }
-                                }
-                            }
-                        }) {
-                            Text("Run Model")
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-                        .disabled(promptText.isEmpty || isProcessing)
-                        
-                        if isProcessing {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .padding()
-                        }
-                        
-                        Text(response)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding()
                 }
-            }
-        }
-        .alert("Setup Failed",
-               isPresented: .init(
-                get: { setupManager.status.isFailed },
-                set: { _ in }
-               )) {
-            Button("Retry", action: {
-                Task {
-                    await setupManager.setup()
-                }
-            })
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            if case .failed(let error) = setupManager.status {
-                Text(error)
             }
         }
     }
-}
-
-private extension SetupStatus {
-    var isFailed: Bool {
-        if case .failed(_) = self {
-            return true
+    
+    private var mainView: some View {
+        VStack(spacing: 20) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let image = selectedImage {
+                        imageSection(image)
+                    }
+                    
+                    if !response.isEmpty {
+                        responseSection
+                    }
+                }
+                .padding()
+            }
+            
+            VStack(spacing: 12) {
+                Toggle(isOn: $webAccessEnabled) {
+                    Text("Enable Web Access")
+                        .font(.subheadline)
+                }
+                .padding(.horizontal)
+                
+                if webAccessEnabled {
+                    Text("You can include URLs in your prompt to analyze web content")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+                
+                inputSection
+            }
         }
-        return false
+        .fileImporter(
+            isPresented: $showImagePicker,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImageSelection(result)
+        }
+    }
+    
+    // ... existing imageSection and responseSection ...
+    
+    private var inputSection: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                Button(action: { showImagePicker = true }) {
+                    Label("Add Image", systemImage: "photo")
+                        .labelStyle(.iconOnly)
+                }
+                .help("Select an image to analyze")
+                
+                TextField(webAccessEnabled ? "Ask a question or paste a URL..." : "Ask a question or type a prompt...",
+                          text: $promptText)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .onSubmit(sendPrompt)
+                
+                Button(action: sendPrompt) {
+                    if isProcessing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill")
+                    }
+                }
+                .disabled(isProcessing || (promptText.isEmpty && selectedImage == nil))
+                .help("Send prompt")
+            }
+            
+            if isWebProcessing {
+                Text("Processing web content...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+    }
+    
+    private func handleImageSelection(_ result: Result<[URL], Error>) {
+        if case .success(let urls) = result,
+           let url = urls.first,
+           let image = NSImage(contentsOf: url) {
+            selectedImage = image
+            
+            // Automatically analyze the image when selected
+            promptText = "What's in this image?"
+            sendPrompt()
+        }
+    }
+    
+    private func sendPrompt() {
+        guard !isProcessing else { return }
+        isProcessing = true
+        
+        // Check if the prompt contains URLs when web access is enabled
+        if webAccessEnabled && promptText.range(of: "https?://[^\\s]+", options: .regularExpression) != nil {
+            isWebProcessing = true
+        }
+        
+        Task {
+            await localModel?.prompt(
+                promptText,
+                images: selectedImage.map { [$0] },
+                streaming: true,
+                webAccess: webAccessEnabled
+            ) { result in
+                response = result
+                isProcessing = false
+                isWebProcessing = false
+            }
+            promptText = ""
+        }
     }
 }
