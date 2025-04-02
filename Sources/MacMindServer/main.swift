@@ -120,7 +120,7 @@ struct MacMindServer: ParsableCommand {
                         return try await withCheckedThrowingContinuation { continuation in
                             model.sendPromptSync(
                                 promptRequest.prompt,
-                                streaming: true,
+                                streaming: false,
                                 showThinking: promptRequest.showThinking ?? true,
                                 pdfs: pdfDocuments,
                                 webAccess: false
