@@ -112,7 +112,7 @@ struct MacMindServer: ParsableCommand {
                                     webAccess: false
                                 ) { response in
                                     // Clean the response and format as proper SSE
-                                    let cleanResponse = response.replacingOccurrences(of: "\n", with: " ")
+//                                    let cleanResponse = response.replacingOccurrences(of: "\n", with: " ")
                                     let data = "data: \(cleanResponse)\n\n".data(using: .utf8)!
                                     _ = writer.write(.buffer(.init(data: data)))
                                 }
