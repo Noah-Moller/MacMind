@@ -111,7 +111,9 @@ struct MacMindServer: ParsableCommand {
                                     pdfs: pdfDocuments,
                                     webAccess: false
                                 ) { response in
-                                    let data = "data: \(response)\n\n".data(using: .utf8)!
+                                    // Clean the response and format as proper SSE
+                                    let cleanResponse = response.replacingOccurrences(of: "\n", with: " ")
+                                    let data = "data: \(cleanResponse)\n\n".data(using: .utf8)!
                                     _ = writer.write(.buffer(.init(data: data)))
                                 }
                             })
