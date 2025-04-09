@@ -181,11 +181,12 @@ public class RemoteModel {
         }
         
         for try await line in bytes.lines {
-            // Handle SSE format by stripping "data:" prefix and processing content
             if line.hasPrefix("data: ") {
-                let content = line.dropFirst(6).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Extract content after "data: " prefix
+                let content = String(line.dropFirst(6))
                 if !content.isEmpty {
-                    onResponse(String(content))
+                    // Send the content with proper line breaks
+                    onResponse(content)
                 }
             }
         }
