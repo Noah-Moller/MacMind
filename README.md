@@ -1,6 +1,6 @@
 # MacMind
 
-**Please note that MacMind has been "Sherlocked" by Apple with Foundation Models(It works alot better and you should use that instead) Happy coding (:**
+**Please note that MacMind has been "Sherlocked" by Apple with Foundation Models(It works alot better and you should use that instead) Happy coding :)**
 
 MacMind is a Swift package designed for easy and efficient local Large Language Model (LLM) processing and advanced image analysis in macOS applications. It provides a clean and dynamic API optimized for Apple hardware, enabling developers to seamlessly integrate LLM processing and intelligent image analysis into their applications.
 
