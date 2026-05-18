@@ -8,23 +8,30 @@
 import Foundation
 import PDFKit
 
-/// Provides a public API to interact with the local DeepSeek R1 model via the Ollama REST API.
+/// Provides a public API to interact with a locally hosted language model via
+/// the Ollama REST API. The exact model is resolved at setup time — if any
+/// model is already installed in Ollama it will be used, otherwise the
+/// fallback Gemma model is pulled and used.
 public class LocalModel {
-    
+
     /// Base URL for the local Ollama REST API.
     private let baseURL = URL(string: "http://localhost:11434/api/")!
-    /// Identifier for the model to be used.
-    private let model = "deepseek-r1:1.5b"
+    /// Identifier for the model to be used. Resolved from `SetupManager`.
+    private let model: String
     /// Shared URL session for non-streaming requests.
     private let session: URLSession = URLSession.shared
-    
+
     private let imageClassifier = ImageClassifier()
-    
+
     /// Initializes a new instance of LocalModel.
-    public init(completion: @Sendable @escaping (Bool) -> Void = { _ in }) async {
-        // Optionally, pull the model if not already downloaded.
-        // (You might want to check some cached flag or status in a production app.)
+    ///
+    /// - Parameters:
+    ///   - model: Optional explicit Ollama model identifier. When `nil`, the
+    ///     model resolved by `SetupManager` is used.
+    public init(model: String? = nil,
+                completion: @Sendable @escaping (Bool) -> Void = { _ in }) async {
         await SetupManager().setup()
+        self.model = model ?? SetupManager.selectedModel
     }
     
     /// Executes a prompt against the local model with optional images and PDFs (async version).

@@ -27,9 +27,11 @@ struct MacMindServer: ParsableCommand {
             throw Abort(.serviceUnavailable, reason: "Ollama is not installed")
         }
         
-        print("Checking DeepSeek model installation...")
-        if !SetupManager.isDeepSeekInstalled() {
-            print("DeepSeek model not found. Pulling model (this may take a while)...")
+        print("Checking for an available Ollama model...")
+        if let existing = SetupManager.preferredInstalledModel() {
+            print("Using pre-existing Ollama model: \(existing)")
+        } else {
+            print("No Ollama models found. Pulling \(SetupManager.fallbackModel) (this may take a while)...")
         }
         
         // Capture configuration values
